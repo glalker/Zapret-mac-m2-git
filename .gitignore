@@ -1,0 +1,15 @@
+# macOS junk
+.DS_Store
+**/.DS_Store
+
+# Runtime / temp
+tmp/*
+!tmp/.gitkeep
+*.log
+*.pid
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*~

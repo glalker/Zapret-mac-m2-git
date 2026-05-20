@@ -1,0 +1,66 @@
+# Список сайтов, к которым применяется обход DPI.
+# Один домен на строку. Поддомены подхватываются автоматически.
+# Можешь добавлять свои строки или удалять ненужные.
+
+# === YouTube и сервисы Google для видео ===
+youtube.com
+youtu.be
+googlevideo.com
+ytimg.com
+ggpht.com
+yt3.ggpht.com
+yt4.ggpht.com
+ytstatic.l.google.com
+withyoutube.com
+youtube-nocookie.com
+youtubekids.com
+youtubeembeddedplayer.googleapis.com
+
+# === Meta / Запрещены в РФ ===
+instagram.com
+cdninstagram.com
+fbcdn.net
+facebook.com
+facebook.net
+fb.com
+fbsbx.com
+meta.com
+messenger.com
+whatsapp.com
+whatsapp.net
+
+# === Twitter / X ===
+twitter.com
+twimg.com
+t.co
+x.com
+
+# === Другие популярные ===
+linkedin.com
+licdn.com
+discord.com
+discord.gg
+discordapp.com
+discordapp.net
+discord.media
+discord.gift
+
+# === Реддит ===
+reddit.com
+redd.it
+redditmedia.com
+redditstatic.com
+
+# === Прочее, что иногда режут ===
+soundcloud.com
+sndcdn.com
+deviantart.com
+patreon.com
+tumblr.com
+notion.so
+notion.site
+proton.me
+protonmail.com
+protonvpn.com
+medium.com
+imgur.com

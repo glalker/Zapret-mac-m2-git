@@ -1,0 +1,62 @@
+# Конфиг zapret для macOS. Скрипт install.sh подкладывает его как /opt/zapret/config.
+
+# --- Общие параметры ---
+SET_MAXELEM=522288
+IPSET_OPT="hashsize 262144 maxelem $SET_MAXELEM"
+
+IP2NET_OPT4="--prefix-length=22-30 --v4-threshold=3/4"
+IP2NET_OPT6="--prefix-length=56-64 --v6-threshold=5"
+
+AUTOHOSTLIST_RETRANS_THRESHOLD=3
+AUTOHOSTLIST_FAIL_THRESHOLD=3
+AUTOHOSTLIST_FAIL_TIME=60
+AUTOHOSTLIST_DEBUGLOG=0
+
+MDIG_THREADS=30
+GZIP_LISTS=0
+
+DESYNC_MARK=0x40000000
+DESYNC_MARK_POSTNAT=0x20000000
+
+# --- Включаем прозрачный прокси tpws ---
+TPWS_ENABLE=1
+TPWS_PORTS=80,443
+
+# Стратегия обхода DPI: работает на YouTube + большинстве заблокированных сайтов.
+# split-pos=1 разрывает TLS SNI после первого байта (главный трюк против DPI).
+# --disorder отправляет пакеты с нарушенной последовательностью.
+# --oob отправляет out-of-band байт, чтобы запутать инспектор.
+TPWS_OPT="
+--filter-tcp=80 --methodeol <HOSTLIST> --new
+--filter-tcp=443 --split-pos=1,midsld --disorder <HOSTLIST>
+"
+
+# SOCKS-режим tpws выключен — нам не нужно.
+TPWS_SOCKS_ENABLE=0
+TPPORT_SOCKS=987
+TPWS_SOCKS_OPT="
+--filter-tcp=80 --methodeol <HOSTLIST> --new
+--filter-tcp=443 --split-pos=1,midsld --disorder <HOSTLIST>
+"
+
+# nfqws/dvtws на macOS не работают (нет divert sockets), оставляем выключенными.
+NFQWS_ENABLE=0
+NFQWS_PORTS_TCP=80,443
+NFQWS_PORTS_UDP=443
+
+# --- Главный фильтр: применяем DPI-обход ТОЛЬКО к доменам из hostlist ---
+MODE_FILTER=hostlist
+
+# Без оффлоада — на маке это и не нужно.
+FLOWOFFLOAD=donttouch
+
+# Применять PF-правила при start/stop.
+INIT_APPLY_FW=1
+
+# Отключаем ipv6 — проще и стабильнее.
+DISABLE_IPV6=1
+
+FILTER_TTL_EXPIRED_ICMP=1
+
+# Перезагрузка таблиц PF после обновления списков ip.
+LISTS_RELOAD="pfctl -qf /etc/pf.conf"
