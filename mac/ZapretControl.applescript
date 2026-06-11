@@ -25,9 +25,14 @@ on mainLoop()
 	repeat
 		try
 			set isRunning to zapretRunning()
+			set isPaused to zapretPaused()
+			-- «Активным» считаем и работающий, и поставленный на автопаузу обход:
+			-- в обоих случаях намерение пользователя — «включено», поэтому кнопка
+			-- предлагает «Выключить». Так нажатие на паузе ВЫКЛЮЧАЕТ (а не включает).
+			set isActive to (isRunning or isPaused)
 			set statusInfo to getQuickStatus(isRunning)
 			set installInfo to getInstallInfo()
-			if isRunning then
+			if isActive then
 				set toggleItem to "⏻ Выключить обход"
 			else
 				set toggleItem to "⏻ Включить обход"
@@ -44,7 +49,7 @@ on mainLoop()
 			set theAction to item 1 of theChoice
 
 			if theAction starts with "⏻" then
-				if isRunning then
+				if isActive then
 					runAction("stop.sh", "", "Выключение обхода")
 				else
 					runAction("start.sh", "", "Включение обхода")
@@ -91,6 +96,16 @@ on zapretRunning()
 	end try
 	return false
 end zapretRunning
+
+-- Обход на автопаузе: tpws не работает, но стоит флаг паузы из-за VPN.
+-- Это значит «намерение — включено», просто временно приглушено.
+on zapretPaused()
+	try
+		do shell script "if [ -f /var/run/zapret.paused-by-vpn ] && ! pgrep -x tpws >/dev/null 2>&1; then echo yes; else echo no; fi"
+		if result is "yes" then return true
+	end try
+	return false
+end zapretPaused
 
 on getQuickStatus(isRunning)
 	if isRunning then

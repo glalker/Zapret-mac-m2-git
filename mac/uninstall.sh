@@ -33,7 +33,7 @@ echo "[+] Удаляю файлы..."
 rm -f /Library/LaunchDaemons/zapret.plist
 rm -f /Library/LaunchDaemons/zapret.vpnwatch.plist
 rm -f /etc/sudoers.d/zapret
-rm -f /var/run/zapret.paused-by-vpn /var/run/zapret.manual-override
+rm -f /var/run/zapret.paused-by-vpn /var/run/zapret.manual-override /var/run/zapret.user-off
 rm -f /etc/pf.anchors/zapret /etc/pf.anchors/zapret-v4 /etc/pf.anchors/zapret-v6
 rm -rf "$INSTALL_DIR"
 
