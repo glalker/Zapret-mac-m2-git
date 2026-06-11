@@ -10,6 +10,8 @@ fi
 INSTALL_DIR="/opt/zapret"
 
 echo "[+] Останавливаю и снимаю PF-якоря..."
+launchctl bootout system/zapret.vpnwatch 2>/dev/null || true
+launchctl unload /Library/LaunchDaemons/zapret.vpnwatch.plist 2>/dev/null || true
 launchctl unload /Library/LaunchDaemons/zapret.plist 2>/dev/null || true
 if [ -x "$INSTALL_DIR/init.d/macos/zapret" ]; then
     "$INSTALL_DIR/init.d/macos/zapret" stop 2>/dev/null || true
@@ -29,7 +31,17 @@ fi
 
 echo "[+] Удаляю файлы..."
 rm -f /Library/LaunchDaemons/zapret.plist
+rm -f /Library/LaunchDaemons/zapret.vpnwatch.plist
+rm -f /etc/sudoers.d/zapret
+rm -f /var/run/zapret.paused-by-vpn /var/run/zapret.manual-override
 rm -f /etc/pf.anchors/zapret /etc/pf.anchors/zapret-v4 /etc/pf.anchors/zapret-v6
 rm -rf "$INSTALL_DIR"
+
+# Агент автооткрытия и приложение у пользователя.
+GUI_USER="${SUDO_USER:-$(stat -f%Su /dev/console 2>/dev/null)}"
+if [ -n "$GUI_USER" ]; then
+    rm -f "/Users/$GUI_USER/Library/LaunchAgents/zapret.gui.plist"
+fi
+rm -rf /Applications/Zapret.app
 
 echo "[+] Готово. zapret полностью удалён с системы."

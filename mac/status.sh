@@ -22,8 +22,16 @@ fi
 
 if pgrep -x tpws >/dev/null 2>&1; then
     echo "Процесс tpws: 🟢 работает (PID: $(pgrep -x tpws | tr '\n' ' '))"
+elif [ -f /var/run/zapret.paused-by-vpn ]; then
+    echo "Процесс tpws: ⏸ на паузе (обнаружен VPN, возобновится сам)"
 else
     echo "Процесс tpws: ⚪ не запущен"
+fi
+
+if [ -f "$INSTALL_DIR/mac/.strategy" ]; then
+    echo "Стратегия   : $(cat "$INSTALL_DIR/mac/.strategy")"
+else
+    echo "Стратегия   : default"
 fi
 
 if pfctl -s info 2>/dev/null | head -1 | grep -q Enabled; then

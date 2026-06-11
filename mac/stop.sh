@@ -12,6 +12,10 @@ LOG="${ZAPRET_LOG:-/tmp/zapret-gui.log}"
 
 log() { echo "$*"; }
 
+# 0. Снимаем флаги автопаузы/override, чтобы vpn-watch не перезапустил zapret
+#    после выключения VPN — ручная остановка значит «выключить совсем».
+rm -f /var/run/zapret.paused-by-vpn /var/run/zapret.manual-override
+
 # 1. Выгружаем launchd-демон, чтобы он не поднял tpws заново.
 #    Пробуем и современный (bootout), и старый (unload) синтаксис.
 launchctl bootout system/zapret 2>/dev/null || true
