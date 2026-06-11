@@ -75,18 +75,20 @@ end mainLoop
 -- === Хелперы ===
 
 on getScriptDir()
-	-- Сначала ищем скрипты рядом с .app (до установки или если .app остался в mac/)
+	-- Сначала проверяем стандартное место установки /opt/zapret/mac.
+	-- Там скрипты принадлежат root и покрыты sudoers → кнопки без пароля
+	-- независимо от того, где физически лежит Zapret.app.
+	try
+		do shell script "test -f /opt/zapret/mac/start.sh"
+		return "/opt/zapret/mac"
+	end try
+	-- Запасной вариант — скрипты рядом с .app (до первой установки).
 	set selfDir to do shell script "dirname " & quoted form of (POSIX path of (path to me))
 	try
 		do shell script "test -f " & quoted form of (selfDir & "/start.sh")
 		return selfDir
 	end try
-	-- Запасной вариант — стандартное место установки (.app можно переносить в /Applications)
-	try
-		do shell script "test -f /opt/zapret/mac/start.sh"
-		return "/opt/zapret/mac"
-	end try
-	error "Не нашёл шелл-скрипты ни рядом с приложением, ни в /opt/zapret/mac. Положи Zapret.app в папку mac/ внутри исходников (или сначала установи zapret оттуда)."
+	error "Не нашёл шелл-скрипты. Сначала установи zapret: открой папку mac/ из архива и запусти install.command."
 end getScriptDir
 
 on zapretRunning()
