@@ -14,10 +14,17 @@
 --     Если правила нет (старая установка) — откатываемся на запрос пароля.
 
 property appTitle : "Zapret"
+-- Лог и exit-файл — с UID в имени. Раньше имя было общим (/tmp/zapret-gui.log),
+-- и если файл успевал создать root (установка), у пользователя редирект в него
+-- падал с permission denied: скрипт не запускался вовсе, а в диалоге показывался
+-- СТАРЫЙ лог («tpws работает») — кнопки выглядели сломанными.
 property logFile : "/tmp/zapret-gui.log"
 property exitFile : "/tmp/zapret-gui.exit"
 
 on run
+	set uid to do shell script "id -u"
+	set logFile to "/tmp/zapret-gui-" & uid & ".log"
+	set exitFile to "/tmp/zapret-gui-" & uid & ".exit"
 	mainLoop()
 end run
 
@@ -190,7 +197,9 @@ on runAction(scriptName, scriptArgs, friendlyName)
 			set summary to "Не удалось запустить процесс." & return & errMsg
 		end try
 	else
-		set shCmd to "/bin/bash " & quoted form of scriptPath & argsPart & " > " & quoted form of logFile & " 2>&1; echo $? > " & quoted form of exitFile & "; tail -n 6 " & quoted form of logFile
+		-- chmod 666 в конце: эта ветка работает как root и создаёт файлы от root;
+		-- без chmod следующий безпарольный запуск (sudo -n) не сможет в них писать.
+		set shCmd to "/bin/bash " & quoted form of scriptPath & argsPart & " > " & quoted form of logFile & " 2>&1; echo $? > " & quoted form of exitFile & "; chmod 666 " & quoted form of logFile & " " & quoted form of exitFile & " 2>/dev/null; tail -n 6 " & quoted form of logFile
 		try
 			set summary to do shell script shCmd with administrator privileges
 		on error errMsg number errNum
@@ -240,7 +249,7 @@ on showStatus()
 			return
 		end try
 	else
-		set shCmd to "/bin/bash " & quoted form of scriptPath & " > " & quoted form of logFile & " 2>&1; tail -n 18 " & quoted form of logFile
+		set shCmd to "/bin/bash " & quoted form of scriptPath & " > " & quoted form of logFile & " 2>&1; chmod 666 " & quoted form of logFile & " 2>/dev/null; tail -n 18 " & quoted form of logFile
 		try
 			set statusOutput to do shell script shCmd with administrator privileges
 		on error errMsg number errNum
