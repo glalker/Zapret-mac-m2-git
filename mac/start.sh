@@ -16,6 +16,17 @@ if [ ! -x "$ZAPRET_BIN" ]; then
     exit 1
 fi
 
+# Ручной запуск отменяет автопаузу vpn-watch — решение пользователя главнее.
+rm -f /var/run/zapret.paused-by-vpn
+
+# Если запускаемся при уже активном VPN — это осознанный выбор «хочу оба сразу».
+# Ставим override, чтобы vpn-watch не погасил обход. Override снимается, когда
+# VPN отключится (vpn-watch) или при ручной остановке (stop.sh).
+if scutil --nc list 2>/dev/null | grep -q '(Connected)' || \
+   route -n get default 2>/dev/null | awk '/interface:/{print $2}' | grep -qE '^(utun|ipsec|ppp|tun|tap|wg)'; then
+    touch /var/run/zapret.manual-override
+fi
+
 # 1. Чистый рестарт: глушим возможные старые процессы, чтобы не плодить инстансы
 #    и не ловить рассинхрон pid-файлов (из-за него статус «врал»).
 "$ZAPRET_BIN" stop 2>/dev/null || true
