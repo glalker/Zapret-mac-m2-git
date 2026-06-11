@@ -16,10 +16,15 @@ INSTALL_DIR="/opt/zapret"
 ZAPRET_BIN="$INSTALL_DIR/init.d/macos/zapret"
 PAUSE_FLAG="/var/run/zapret.paused-by-vpn"
 OVERRIDE_FLAG="/var/run/zapret.manual-override"
+USEROFF_FLAG="/var/run/zapret.user-off"
 LOG="/tmp/zapret-vpnwatch.log"
 
 [ -f "$INSTALL_DIR/mac/vpn-watch.disabled" ] && exit 0
 [ -x "$ZAPRET_BIN" ] || exit 0
+
+# Пользователь выключил обход вручную (stop.sh) — НЕ трогаем ничего: ни
+# паузу, ни возобновление. Обход остаётся выключенным до ручного «Включить».
+[ -f "$USEROFF_FLAG" ] && exit 0
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >>"$LOG"; }
 
