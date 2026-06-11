@@ -1,8 +1,7 @@
 #!/bin/bash
 #
 # install.sh — установщик zapret для macOS (Apple Silicon / Intel).
-# Запускай так:
-#   cd "/Users/kereytovgleb/cloudeP/Claude/Projects/zapret-v72.12/mac"
+# Запускай из папки mac/ внутри проекта:
 #   sudo ./install.sh
 #
 # Делает следующее:
