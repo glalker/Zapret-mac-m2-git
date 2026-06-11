@@ -48,12 +48,20 @@ if vpn_active; then
     if [ -f "$OVERRIDE_FLAG" ]; then
         exit 0
     fi
-    if pgrep -x tpws >/dev/null 2>&1 && [ ! -f "$PAUSE_FLAG" ]; then
-        log "VPN обнаружен — ставлю zapret на паузу."
+    # Идемпотентно: убиваем tpws каждый раз когда VPN активен, даже если
+    # pause_flag уже стоит (защита от перезапуска tpws через launchd или GUI).
+    if pgrep -x tpws >/dev/null 2>&1; then
+        if [ ! -f "$PAUSE_FLAG" ]; then
+            log "VPN обнаружен — ставлю zapret на паузу."
+        else
+            log "VPN активен, tpws ожил снова — принудительно останавливаю."
+        fi
         "$ZAPRET_BIN" stop >>"$LOG" 2>&1 || true
         pkill -x tpws 2>/dev/null || true
         touch "$PAUSE_FLAG"
         log "zapret на паузе (tpws остановлен, PF-якоря сняты)."
+    elif [ ! -f "$PAUSE_FLAG" ]; then
+        touch "$PAUSE_FLAG"
     fi
 else
     # VPN выключен — override (если был) больше не нужен: при следующем

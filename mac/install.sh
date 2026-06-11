@@ -50,7 +50,18 @@ SRC_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 INSTALL_DIR="/opt/zapret"
 
 # Пользователь, которому даём управление GUI без пароля и агент автооткрытия.
-GUI_USER="${SUDO_USER:-$(stat -f%Su /dev/console 2>/dev/null)}"
+# Несколько fallback'ов: SUDO_USER (sudo из терминала), консольный владелец
+# (нормальный запуск), SCDynamicStore (надёжно при эскалации из AppleScript).
+GUI_USER="${SUDO_USER:-}"
+if [ -z "$GUI_USER" ] || [ "$GUI_USER" = "root" ]; then
+    GUI_USER="$(stat -f%Su /dev/console 2>/dev/null)"
+fi
+if [ -z "$GUI_USER" ] || [ "$GUI_USER" = "root" ]; then
+    GUI_USER="$(scutil <<< "show State:/Users/ConsoleUser" 2>/dev/null | awk '/Name :/{print $3}')"
+fi
+if [ -z "$GUI_USER" ] || [ "$GUI_USER" = "root" ]; then
+    GUI_USER="$(who | awk '/console/{print $1; exit}')"
+fi
 
 # Если install.sh запущен из самой установки (/opt/zapret/mac) — например,
 # через «Переустановить» в GUI из /Applications — то копировать нечего и
@@ -154,11 +165,13 @@ if [ -n "$GUI_USER" ]; then
 # Скрипты принадлежат root и не доступны на запись пользователю.
 $GUI_USER ALL=(root) NOPASSWD: $INSTALL_DIR/mac/start.sh, $INSTALL_DIR/mac/stop.sh, $INSTALL_DIR/mac/status.sh, $INSTALL_DIR/mac/strategy.sh
 EOF
-    if visudo -cf "$SUDOERS_TMP" >/dev/null 2>&1; then
+    VISUDO_ERR=$(visudo -cf "$SUDOERS_TMP" 2>&1)
+    if [ $? -eq 0 ]; then
         install -m 0440 -o root -g wheel "$SUDOERS_TMP" /etc/sudoers.d/zapret
         info "Готово: «Включить/Выключить» в GUI больше не просят пароль."
     else
-        warn "visudo забраковал sudoers-правило — пропускаю (GUI будет спрашивать пароль)."
+        warn "visudo забраковал sudoers-правило: $VISUDO_ERR"
+        warn "GUI будет спрашивать пароль. Исправь вручную: sudo visudo -f /etc/sudoers.d/zapret"
     fi
     rm -f "$SUDOERS_TMP"
 else
