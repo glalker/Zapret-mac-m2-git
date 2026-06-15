@@ -163,7 +163,7 @@ if [ -n "$GUI_USER" ]; then
     cat >"$SUDOERS_TMP" <<EOF
 # Создано zapret install.sh: управление обходом из Zapret.app без пароля.
 # Скрипты принадлежат root и не доступны на запись пользователю.
-$GUI_USER ALL=(root) NOPASSWD: $INSTALL_DIR/mac/start.sh, $INSTALL_DIR/mac/stop.sh, $INSTALL_DIR/mac/status.sh, $INSTALL_DIR/mac/strategy.sh
+$GUI_USER ALL=(root) NOPASSWD: $INSTALL_DIR/mac/start.sh, $INSTALL_DIR/mac/stop.sh, $INSTALL_DIR/mac/status.sh, $INSTALL_DIR/mac/strategy.sh, $INSTALL_DIR/mac/selftest.sh, $INSTALL_DIR/mac/update.sh
 EOF
     VISUDO_ERR=$(visudo -cf "$SUDOERS_TMP" 2>&1)
     if [ $? -eq 0 ]; then
