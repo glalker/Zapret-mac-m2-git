@@ -36,7 +36,8 @@ let kStrategies: [Strategy] = [
 
 let kInstallDir = "/opt/zapret"
 let kMacDir = "/opt/zapret/mac"
-let kAppVersion = "2.0.0"
+let kAppVersion = "2.0.1"
+let kRepo = "glalker/Zapret-mac-m2-git"
 
 // MARK: - Запуск процессов
 
@@ -247,6 +248,107 @@ final class Controller: ObservableObject {
         }
     }
 
+    // MARK: Проверка и установка обновлений из релизов GitHub
+
+    // Проверка версии — read-only, без пароля.
+    func checkForUpdate() {
+        busy = true; busyTitle = "Проверяю обновления…"
+        DispatchQueue.global().async {
+            let api = "https://api.github.com/repos/\(kRepo)/releases/latest"
+            let res = runCapture("/usr/bin/curl", ["-fsSL", "-m", "15", api])
+            let tag = Self.parseTag(res.out)
+            DispatchQueue.main.async {
+                self.busy = false
+                self.handleVersion(tag)
+            }
+        }
+    }
+
+    // Достаём значение "tag_name" из JSON ответа GitHub.
+    static func parseTag(_ json: String) -> String {
+        guard let r = json.range(of: "\"tag_name\"") else { return "" }
+        let after = json[r.upperBound...]
+        guard let q1 = after.range(of: "\"") else { return "" }
+        let rest = after[q1.upperBound...]
+        guard let q2 = rest.range(of: "\"") else { return "" }
+        return String(rest[..<q2.lowerBound])
+    }
+
+    // "2.0.1" → [2,0,1]; сравнение покомпонентно.
+    static func isNewer(_ a: String, than b: String) -> Bool {
+        let norm: (String) -> [Int] = { s in
+            s.trimmingCharacters(in: .whitespaces)
+             .replacingOccurrences(of: "v", with: "")
+             .split(whereSeparator: { $0 == "." || $0 == " " })
+             .prefix(3).compactMap { Int($0) }
+        }
+        let pa = norm(a), pb = norm(b)
+        for i in 0..<3 {
+            let x = i < pa.count ? pa[i] : 0
+            let y = i < pb.count ? pb[i] : 0
+            if x != y { return x > y }
+        }
+        return false
+    }
+
+    private func handleVersion(_ tag: String) {
+        let clean = tag.trimmingCharacters(in: .whitespaces)
+        guard !clean.isEmpty else {
+            alert("Не удалось проверить обновления.\nПроверь интернет (или включи обход, если GitHub режут).", warning: true)
+            return
+        }
+        if Self.isNewer(clean, than: kAppVersion) {
+            let a = NSAlert()
+            a.messageText = "Доступна новая версия \(clean)"
+            a.informativeText = "У тебя v\(kAppVersion). Скачать и установить \(clean)?\nПонадобится пароль администратора."
+            a.addButton(withTitle: "Обновить")
+            a.addButton(withTitle: "Позже")
+            if a.runModal() == .alertFirstButtonReturn { runUpdate(clean) }
+        } else {
+            alert("У тебя последняя версия (v\(kAppVersion)).", warning: false)
+        }
+    }
+
+    private func runUpdate(_ tag: String) {
+        busy = true; busyTitle = "Обновляю до \(tag)…"; showLog = true
+        log = "⬇️ Скачиваю и устанавливаю \(tag). Введи пароль администратора в системном окне.\n"
+        DispatchQueue.global().async {
+            let script = self.updaterPath()
+            let cmd = "do shell script \"/bin/bash \\\"\(script)\\\" \(tag) 2>&1\" with administrator privileges"
+            let res = runCapture("/usr/bin/osascript", ["-e", cmd])
+            DispatchQueue.main.async {
+                self.busy = false
+                self.log += res.out + "\n— Готово —\n"
+                self.refresh()
+                if res.code == 0 { self.offerRelaunch(tag) }
+            }
+        }
+    }
+
+    private func offerRelaunch(_ tag: String) {
+        let a = NSAlert()
+        a.messageText = "Обновление \(tag) установлено"
+        a.informativeText = "Перезапустить Zapret, чтобы применить новую версию?"
+        a.addButton(withTitle: "Перезапустить")
+        a.addButton(withTitle: "Позже")
+        if a.runModal() == .alertFirstButtonReturn {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/sh")
+            p.arguments = ["-c", "sleep 1; open -n /Applications/Zapret.app"]
+            try? p.run()
+            NSApp.terminate(nil)
+        }
+    }
+
+    // update-app.sh: сначала в бандле (есть всегда), потом в /opt/zapret/mac.
+    private func updaterPath() -> String {
+        if let res = Bundle.main.resourceURL?.appendingPathComponent("update-app.sh").path,
+           FileManager.default.fileExists(atPath: res) {
+            return res
+        }
+        return "\(kMacDir)/update-app.sh"
+    }
+
     // install.sh: предпочитаем установленную копию (in-place), иначе рядом с .app.
     private func installerPath() -> String {
         if FileManager.default.fileExists(atPath: "\(kMacDir)/install.sh") {
@@ -406,6 +508,7 @@ struct ContentView: View {
         VStack(spacing: 10) {
             actionRow("Обновить списки сайтов", "arrow.down.circle", { c.updateLists() })
             actionRow("Мои сайты (ручной список)", "square.and.pencil", { c.editHosts() })
+            actionRow("Проверить обновления приложения", "arrow.triangle.2.circlepath", { c.checkForUpdate() })
         }
         .padding(16)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.5), in: RoundedRectangle(cornerRadius: 16))
@@ -574,6 +677,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         }
 
         menu.addItem(.separator())
+        let chk = NSMenuItem(title: "Проверить обновления…", action: #selector(menuCheckUpdate), keyEquivalent: "")
+        chk.target = self
+        menu.addItem(chk)
         let show = NSMenuItem(title: "Открыть окно Zapret", action: #selector(showWindow(_:)), keyEquivalent: "")
         show.target = self
         menu.addItem(show)
@@ -585,6 +691,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     @objc func menuAutotest() { showWindow(nil); controller.runAutotest() }
     @objc func menuUpdate() { showWindow(nil); controller.updateLists() }
     @objc func menuReinstall() { showWindow(nil); controller.reinstall() }
+    @objc func menuCheckUpdate() { showWindow(nil); controller.checkForUpdate() }
     @objc func menuSetStrategy(_ sender: NSMenuItem) {
         if let name = sender.representedObject as? String { controller.setStrategy(name) }
     }

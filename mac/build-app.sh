@@ -68,8 +68,8 @@ cat >"$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleIdentifier</key><string>su.glalker.zapret</string>
     <key>CFBundleName</key><string>Zapret</string>
     <key>CFBundleDisplayName</key><string>Zapret</string>
-    <key>CFBundleShortVersionString</key><string>2.0.0</string>
-    <key>CFBundleVersion</key><string>2.0.0</string>
+    <key>CFBundleShortVersionString</key><string>2.0.1</string>
+    <key>CFBundleVersion</key><string>2.0.1</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>NSHighResolutionCapable</key><true/>
@@ -78,6 +78,7 @@ cat >"$APP/Contents/Info.plist" <<PLIST
 </dict></plist>
 PLIST
 
+cp "$SCRIPT_DIR/update-app.sh" "$APP/Contents/Resources/update-app.sh" 2>/dev/null && chmod +x "$APP/Contents/Resources/update-app.sh"
 echo "APPL????" >"$APP/Contents/PkgInfo"
 
 # Ad-hoc подпись — иначе macOS может ругаться на неподписанное приложение.

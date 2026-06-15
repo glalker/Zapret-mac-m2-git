@@ -3,9 +3,22 @@
 <plist version="1.0">
 <dict>
 	<key>files</key>
-	<dict/>
+	<dict>
+		<key>Resources/update-app.sh</key>
+		<data>
+		RMeNS2H9bV3tiRGkvmtD9Iqj3V0=
+		</data>
+	</dict>
 	<key>files2</key>
-	<dict/>
+	<dict>
+		<key>Resources/update-app.sh</key>
+		<dict>
+			<key>hash2</key>
+			<data>
+			aNjzsqU1FkR1rGOBksfeXvM4kUtQ8oOE9DpOohjiHN8=
+			</data>
+		</dict>
+	</dict>
 	<key>rules</key>
 	<dict>
 		<key>^Resources/</key>
