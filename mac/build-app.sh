@@ -34,7 +34,7 @@ rm -rf "$APP"
 
 info "Компилирую Swift (universal arm64 + x86_64)..."
 # Универсальный бинарник, чтобы работал и на Apple Silicon, и на Intel.
-swiftc -O -parse-as-library -swift-version 5 \
+swiftc -O -swift-version 5 \
     -target arm64-apple-macos13 \
     app/main.swift -o "/tmp/zapret-arm64" \
     -framework SwiftUI -framework AppKit 2>/tmp/zapret-build.log || {
@@ -43,7 +43,7 @@ swiftc -O -parse-as-library -swift-version 5 \
 
 # x86_64 собираем, только если доступен (на Intel-маках или с нужными SDK).
 ARCHS_OK="/tmp/zapret-arm64"
-if swiftc -O -parse-as-library -swift-version 5 \
+if swiftc -O -swift-version 5 \
     -target x86_64-apple-macos13 \
     app/main.swift -o "/tmp/zapret-x86_64" \
     -framework SwiftUI -framework AppKit 2>>/tmp/zapret-build.log; then
