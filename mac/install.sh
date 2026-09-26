@@ -29,7 +29,16 @@ CLR='\033[0m'
 
 info()  { printf "${GRN}[+] %s${CLR}\n" "$*"; }
 warn()  { printf "${YLW}[!] %s${CLR}\n" "$*"; }
-die()   { printf "${RED}[x] %s${CLR}\n" "$*" >&2; exit 1; }
+die()   {
+    printf "${RED}[x] %s${CLR}\n" "$*" >&2
+    # Если установка упала после rm -rf, а списки доменов ещё не вернулись из
+    # временного каталога — без этой подсказки человек их просто потеряет.
+    if [ -n "$USERDATA_STASH" ] && [ -d "$USERDATA_STASH" ]; then
+        printf "${YLW}[!] Твои списки доменов сохранены тут и ждут: %s${CLR}\n" "$USERDATA_STASH" >&2
+        printf "${YLW}[!} Скопируй их обратно: sudo cp %s/*.txt /opt/zapret/userdata/${CLR}\n" "$USERDATA_STASH" >&2
+    fi
+    exit 1
+}
 
 # ----- Пользовательские данные: вынесены из ipset/ -----
 # Папка ipset/ — не просто данные: там лежит root-исполняемый код (def.sh,
