@@ -200,14 +200,55 @@ final class Controller: ObservableObject {
 
     // MARK: Открыть список «мои сайты»
 
-    func editHosts() {
-        let path = "\(kInstallDir)/ipset/zapret-hosts-user.txt"
-        if FileManager.default.fileExists(atPath: path) {
-            runCapture("/usr/bin/open", ["-a", "TextEdit", path])
-            alert("Список открыт в TextEdit.\nДобавь домены над строкой «>>> AUTO», сохрани (Cmd+S), затем выключи и включи обход.", warning: false)
-        } else {
-            alert("zapret ещё не установлен.", warning: true)
+    private static let hostsUserPath = "\(kInstallDir)/userdata/zapret-hosts-user.txt"
+    private static let hostsLegacyPath = "\(kInstallDir)/ipset/zapret-hosts-user.txt"
+
+    private func runPermCheck() -> String {
+        let script = "\(kMacDir)/check-perms.sh"
+        guard FileManager.default.isExecutableFile(atPath: script) else {
+            return "Диагностика не найдена: \(script) отсутствует."
         }
+        let res = runCapture("/bin/bash", [script])
+        return res.out.isEmpty ? "check-perms.sh не вывел ничего (код \(res.code))." : res.out
+    }
+
+    private func firstFailure(_ report: String) -> String? {
+        report.split(separator: "\n")
+            .first { $0.contains(": FAIL - ") }
+            .map(String.init)
+    }
+
+    func editHosts() {
+        let path = FileManager.default.fileExists(atPath: Self.hostsUserPath)
+            ? Self.hostsUserPath : Self.hostsLegacyPath
+
+        guard FileManager.default.fileExists(atPath: path) else {
+            alert("zapret ещё не установлен.", warning: true)
+            return
+        }
+
+        // Проверяем доступность на запись заранее: иначе TextEdit откроет файл,
+        // но Cmd+S молча ничего не сохранит — ровно тот баг, который чиним.
+        if !FileManager.default.isWritableFile(atPath: path) {
+            let report = runPermCheck()
+            log += "\n— Проверка прав —\n\(report)"
+            showLog = true
+            let why = firstFailure(report) ?? "причина не определена"
+            alert("Список не доступен для редактирования.\n\n\(why)\n\nПереустанови zapret, это починит права.", warning: true)
+            return
+        }
+
+        let res = runCapture("/usr/bin/open", ["-a", "TextEdit", path])
+        guard res.code == 0 else {
+            let report = runPermCheck()
+            log += "\n— Проверка прав —\n\(report)\n— open вернул код \(res.code): \(res.out)"
+            showLog = true
+            let why = firstFailure(report) ?? "TextEdit не запустился (код \(res.code))"
+            alert("Не удалось открыть список в TextEdit.\n\n\(why)", warning: true)
+            return
+        }
+
+        alert("Список открыт в TextEdit.\nДобавь домены над строкой «>>> AUTO», сохрани (Cmd+S), затем выключи и включи обход.", warning: false)
     }
 
     // MARK: Установка/удаление (нужен пароль)
@@ -700,13 +741,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 }
 
 // MARK: - main
+// Файл называется main.swift, поэтому он и есть точка входа: @main здесь
+// запрещён (нельзя одновременно иметь верхний уровень и @main). Код ниже —
+// обычные инструкции верхнего уровня, из-за чего SourceKit и swiftc видят
+// одинаковую картину без -parse-as-library.
 
-@main
-struct ZapretMain {
-    static func main() {
-        let app = NSApplication.shared
-        let delegate = AppDelegate()
-        app.delegate = delegate
-        app.run()
-    }
-}
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.run()

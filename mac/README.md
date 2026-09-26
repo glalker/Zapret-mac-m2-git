@@ -145,16 +145,27 @@ sudo ./install.sh
 
 ## Список сайтов
 
-Лежит в `/opt/zapret/ipset/zapret-hosts-user.txt`. Шаблон лежит здесь же — в
+Лежит в `/opt/zapret/userdata/zapret-hosts-user.txt`. Шаблон лежит здесь же — в
 `zapret-hosts.txt`. По умолчанию там YouTube, Instagram, Facebook, Twitter/X,
 LinkedIn, Discord, Reddit и ещё пара популярных сервисов.
+
+Папка `userdata/` принадлежит тебе, поэтому править список можно без `sudo` —
+из TextEdit по кнопке «Мои сайты» в приложении или прямо из терминала. Старый
+путь `/opt/zapret/ipset/zapret-hosts-user.txt` продолжает работать: это симлинк.
 
 Чтобы добавить свой сайт:
 
 ```bash
-sudo nano /opt/zapret/ipset/zapret-hosts-user.txt
+nano /opt/zapret/userdata/zapret-hosts-user.txt
 # дописал домен на новой строке, сохранил Ctrl+O, вышел Ctrl+X
 sudo ./stop.sh && sudo ./start.sh
+```
+
+Если прав вдруг отказали, посмотри, что именно сломано (скрипт ничего не меняет,
+`sudo` не нужен):
+
+```bash
+/opt/zapret/mac/check-perms.sh
 ```
 
 Поддомены подхватываются автоматически: добавил `example.com` — работает и
@@ -244,6 +255,8 @@ mac/
 ├── stop.sh                # остановка
 ├── status.sh              # статус
 ├── strategy.sh            # переключение стратегии обхода DPI
+├── check-perms.sh         # диагностика прав (read-only, sudo не нужен)
+├── test-perms.sh          # регрессионные тесты раскладки списков
 ├── vpn-watch.sh           # демон автопаузы при VPN
 ├── gui-login.sh           # автооткрытие окна при входе в систему
 ├── config.macos           # конфиг, который кладётся в /opt/zapret/config
@@ -253,7 +266,9 @@ mac/
 /opt/zapret/                                  # сюда install.sh всё разворачивает
 ├── tpws/tpws                                 # сам прокси
 ├── config                                    # активный конфиг
-├── ipset/zapret-hosts-user.txt               # активный список сайтов
+├── userdata/zapret-hosts-user.txt            # активный список сайтов (твой, без sudo)
+├── ipset/zapret-hosts-user.txt               # симлинк на список выше
+├── mac/check-perms.sh                        # диагностика прав (read-only)
 ├── mac/.strategy                             # имя активной стратегии
 └── init.d/macos/zapret                       # стартовый скрипт
 

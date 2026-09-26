@@ -16,10 +16,15 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 INSTALL_DIR="/opt/zapret"
-HOSTS="$INSTALL_DIR/ipset/zapret-hosts-user.txt"
+# Списки доменов живут в userdata/ (владелец — GUI-пользователь), а в ipset/
+# на них указывают симлинки. Пишем по настоящему пути, а не по симлинку.
+HOSTS="$INSTALL_DIR/userdata/zapret-hosts-user.txt"
 URL="https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Russia/inside-raw.lst"
 BEGIN="# >>> AUTO (itdoginfo/allow-domains) — не редактировать, перезаписывается"
 END="# <<< AUTO"
+
+# Каталог с данными пользователя: записи не осталось — пересоздаём.
+[ -d "$INSTALL_DIR/userdata" ] || mkdir -p "$INSTALL_DIR/userdata"
 
 echo "[*] Скачиваю список доменов с itdoginfo/allow-domains…"
 TMP=$(mktemp)
@@ -66,8 +71,19 @@ fi
 } >"$HOSTS"
 rm -f "$PERSONAL" "$CLEAN"
 
-# Список должен быть редактируемым из GUI без sudo.
-chmod 666 "$HOSTS" 2>/dev/null || true
+# Возвращаем файлу владельца GUI-пользователя: обновление идёт от root, и без
+# этого следующая правка в TextEdit снова потребовала бы sudo.
+GUI_USER="${SUDO_USER:-}"
+if [ -z "$GUI_USER" ] || [ "$GUI_USER" = "root" ]; then
+    GUI_USER="$(stat -f%Su /dev/console 2>/dev/null)"
+fi
+if [ -n "$GUI_USER" ] && [ "$GUI_USER" != "root" ]; then
+    chown "$GUI_USER" "$HOSTS" 2>/dev/null || true
+    chmod 644 "$HOSTS" 2>/dev/null || true
+    echo "[+] Права на список вернул пользователю $GUI_USER."
+else
+    echo "[!] Не смог определить пользователя GUI — список придётся править с sudo."
+fi
 TOTAL=$(grep -vcE '^\s*#|^\s*$' "$HOSTS")
 echo "[+] Список обновлён: всего активных доменов $TOTAL."
 

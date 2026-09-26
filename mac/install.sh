@@ -29,7 +29,66 @@ CLR='\033[0m'
 
 info()  { printf "${GRN}[+] %s${CLR}\n" "$*"; }
 warn()  { printf "${YLW}[!] %s${CLR}\n" "$*"; }
-die()   { printf "${RED}[x] %s${CLR}\n" "$*" >&2; exit 1; }
+die()   {
+    printf "${RED}[x] %s${CLR}\n" "$*" >&2
+    # Если установка упала после rm -rf, а списки доменов ещё не вернулись из
+    # временного каталога — без этой подсказки человек их просто потеряет.
+    if [ -n "$USERDATA_STASH" ] && [ -d "$USERDATA_STASH" ]; then
+        printf "${YLW}[!] Твои списки доменов сохранены тут и ждут: %s${CLR}\n" "$USERDATA_STASH" >&2
+        printf "${YLW}[!} Скопируй их обратно: sudo cp %s/*.txt /opt/zapret/userdata/${CLR}\n" "$USERDATA_STASH" >&2
+    fi
+    exit 1
+}
+
+# ----- Пользовательские данные: вынесены из ipset/ -----
+# Папка ipset/ — не просто данные: там лежит root-исполняемый код (def.sh,
+# antifilter.helper, create_ipset.sh), который init.d/macos/functions
+# подключает от root, а launchd-сервис zapret.plist поднимает без sudoers.
+# Если дать на ipset/ права записи, любой пользователь соответствующей группы
+# подменит этот код и получит root. Поэтому редактируемые списки доменов живут
+# в отдельной папке userdata/, а на них указывают симлинки со старых путей.
+# Владелец userdata — GUI-пользователь, поэтому атомарное сохранение
+# (temp + rename) в TextEdit работает без sudo и без ручных chmod.
+setup_userdata() {
+    mkdir -p "$USERDATA_DIR"
+
+    # Переезд со старой схемы: реальный файл в ipset/ становится содержимым
+    # userdata. Идёт первым — иначе свежая раскладка ниже затёрла бы его
+    # стоковым списком и пользователь потерял бы свои домены.
+    if [ -f "$IPSET_DIR/zapret-hosts-user.txt" ] && [ ! -L "$IPSET_DIR/zapret-hosts-user.txt" ]; then
+        if [ ! -s "$HOSTS_USER" ]; then
+            mv "$IPSET_DIR/zapret-hosts-user.txt" "$HOSTS_USER"
+        else
+            rm -f "$IPSET_DIR/zapret-hosts-user.txt"
+        fi
+    fi
+
+    # Досоздаём только то, чего нет: сюда попадает свежая установка, где
+    # install.sh уже очистил дерево. При обновлении на месте файлы на месте,
+    # и стоковый список пользователю не навязывается.
+    [ -f "$HOSTS_USER" ]   || cp "$SCRIPT_DIR/zapret-hosts.txt" "$HOSTS_USER"   2>/dev/null || true
+    [ -f "$HOSTS_MASTER" ] || cp "$SCRIPT_DIR/zapret-hosts.txt" "$HOSTS_MASTER" 2>/dev/null || true
+
+    # Возвращаем списки, отложенные перед rm -rf при переустановке.
+    if [ -n "$USERDATA_STASH" ]; then
+        cp "$USERDATA_STASH/zapret-hosts-user.txt" "$HOSTS_USER"   2>/dev/null || true
+        cp "$USERDATA_STASH/zapret-hosts.txt"      "$HOSTS_MASTER" 2>/dev/null || true
+        info "Твои списки доменов восстановлены."
+        rm -rf "$USERDATA_STASH"
+        USERDATA_STASH=""
+    fi
+
+    if [ -n "$GUI_USER" ]; then
+        chown -R "$GUI_USER" "$USERDATA_DIR" 2>/dev/null || true
+    fi
+    chmod 755 "$USERDATA_DIR" 2>/dev/null || true
+    chmod 644 "$USERDATA_DIR"/*.txt 2>/dev/null || true
+
+    # Симлинки: zapret и GUI продолжают видеть списки по привычным путям.
+    ln -sf "$HOSTS_USER"   "$IPSET_DIR/zapret-hosts-user.txt"
+    ln -sf "$HOSTS_MASTER" "$IPSET_DIR/zapret-hosts.txt"
+    ln -sf "$HOSTS_MASTER" "$MAC_DIR/zapret-hosts.txt"
+}
 
 # ----- 1. Проверка платформы -----
 [ "$(uname)" = "Darwin" ] || die "Этот скрипт только для macOS."
@@ -48,6 +107,13 @@ SRC_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 [ -d "$SRC_DIR/binaries/mac64" ] || die "Не нашёл $SRC_DIR/binaries/mac64."
 
 INSTALL_DIR="/opt/zapret"
+IPSET_DIR="$INSTALL_DIR/ipset"
+MAC_DIR="$INSTALL_DIR/mac"
+USERDATA_DIR="$INSTALL_DIR/userdata"
+HOSTS_USER="$USERDATA_DIR/zapret-hosts-user.txt"
+HOSTS_MASTER="$USERDATA_DIR/zapret-hosts.txt"
+# Каталог, куда откладываем списки пользователя на время rm -rf при переустановке.
+USERDATA_STASH=""
 
 # Пользователь, которому даём управление GUI без пароля и агент автооткрытия.
 # Несколько fallback'ов: SUDO_USER (sudo из терминала), консольный владелец
@@ -77,6 +143,17 @@ if [ "$IN_PLACE" = "0" ]; then
         "$INSTALL_DIR/init.d/macos/zapret" stop 2>/dev/null || true
         launchctl unload /Library/LaunchDaemons/zapret.plist 2>/dev/null || true
         rm -f /Library/LaunchDaemons/zapret.plist
+        # Списки доменов — данные пользователя, а не часть установки. Переносим
+        # их в сторону до rm -rf, иначе переустановка из GUI съедала бы всё
+        # личное, что человек набрал. Со старой схемы берём файл из ipset/.
+        USERDATA_STASH=""
+        if [ -f "$INSTALL_DIR/userdata/zapret-hosts-user.txt" ]; then
+            USERDATA_STASH=$(mktemp -d)
+            cp "$INSTALL_DIR/userdata/"*.txt "$USERDATA_STASH/" 2>/dev/null || true
+            [ -s "$USERDATA_STASH/zapret-hosts-user.txt" ] || \
+                cp "$INSTALL_DIR/ipset/zapret-hosts-user.txt" "$USERDATA_STASH/zapret-hosts-user.txt" 2>/dev/null || true
+            info "Сохраняю твои списки доменов перед переустановкой..."
+        fi
         rm -rf "$INSTALL_DIR"
     fi
 
@@ -102,10 +179,6 @@ info "Раскладываю бинарники (mac64 universal: arm64 + x86_64
 # ----- 8. Подкладываем наш конфиг и список доменов -----
 info "Подкладываю конфигурацию и список доменов..."
 cp "$SCRIPT_DIR/config.macos"     "$INSTALL_DIR/config"
-# При обновлении на месте список доменов пользователя не трогаем.
-if [ "$IN_PLACE" = "0" ] || [ ! -f "$INSTALL_DIR/ipset/zapret-hosts-user.txt" ]; then
-    cp "$SCRIPT_DIR/zapret-hosts.txt" "$INSTALL_DIR/ipset/zapret-hosts-user.txt"
-fi
 
 # Создаём пустой файл исключений (если его нет).
 [ -f "$INSTALL_DIR/ipset/zapret-hosts-user-exclude.txt" ] || \
@@ -113,17 +186,13 @@ fi
        "$INSTALL_DIR/ipset/zapret-hosts-user-exclude.txt" 2>/dev/null || \
     touch "$INSTALL_DIR/ipset/zapret-hosts-user-exclude.txt"
 
-# Делаем список доменов user-writable (чтобы можно было править через GUI без sudo).
-chmod 666 "$INSTALL_DIR/ipset/zapret-hosts-user.txt" 2>/dev/null || true
-
 # Копируем мак-скрипты в стандартное место /opt/zapret/mac.
 # Это нужно для GUI-приложения Zapret.app, чтобы оно могло работать из /Applications.
 if [ "$IN_PLACE" = "0" ]; then
-    info "Копирую mac-скрипты в $INSTALL_DIR/mac ..."
+    info "Копирую мак-скрипты в $INSTALL_DIR/mac ..."
     mkdir -p "$INSTALL_DIR/mac"
     cp "$SCRIPT_DIR"/*.sh "$INSTALL_DIR/mac/"
     cp "$SCRIPT_DIR/config.macos" "$INSTALL_DIR/mac/" 2>/dev/null || true
-    cp "$SCRIPT_DIR/zapret-hosts.txt" "$INSTALL_DIR/mac/" 2>/dev/null || true
 fi
 chmod +x "$INSTALL_DIR/mac/"*.sh
 
@@ -143,8 +212,16 @@ fi
 # sudoers NOPASSWD ниже (иначе скрипты мог бы подменить кто угодно).
 info "Выставляю владельца root на $INSTALL_DIR ..."
 chown -R root:wheel "$INSTALL_DIR" 2>/dev/null || true
-# Список доменов оставляем редактируемым из GUI без sudo.
-chmod 666 "$INSTALL_DIR/ipset/zapret-hosts-user.txt" 2>/dev/null || true
+
+# Возвращаем userdata пользователю: chown выше забрал его, а редактировать
+# списки доменов он должен без sudo. Идёт строго после chown -R.
+setup_userdata
+
+# Диагностика прав — read-only, полезна и из GUI, и руками.
+if [ -f "$SCRIPT_DIR/check-perms.sh" ] && [ ! -f "$MAC_DIR/check-perms.sh" ]; then
+    cp "$SCRIPT_DIR/check-perms.sh" "$MAC_DIR/check-perms.sh" 2>/dev/null || true
+    chmod 755 "$MAC_DIR/check-perms.sh" 2>/dev/null || true
+fi
 
 # ----- 9. Регистрируем launchd-сервис -----
 info "Регистрирую launchd-сервис..."
@@ -258,7 +335,8 @@ if pgrep -x tpws >/dev/null; then
     echo "    Статус:   sudo $SCRIPT_DIR/status.sh"
     echo "    Удалить:  sudo $SCRIPT_DIR/uninstall.sh"
     echo
-    echo "  Список сайтов:  $INSTALL_DIR/ipset/zapret-hosts-user.txt"
+    echo "  Список сайтов:  $HOSTS_USER"
+    echo "  Проверка прав:  sudo $MAC_DIR/check-perms.sh"
     echo "  Конфиг:         $INSTALL_DIR/config"
     echo "  Лог tpws:       консоль (Console.app, фильтр 'tpws')"
 else
