@@ -17,13 +17,19 @@ fi
 
 INSTALL_DIR="/opt/zapret"
 MAC="$INSTALL_DIR/mac"
-STRATEGIES="default split-only midsld oob hostcase"
+# Список стратегий берём из strategy.sh — единственный источник правды.
+STRATEGIES=$("$MAC/strategy.sh" names 2>/dev/null)
+# Таймаут на один сайт: DPI обычно рвёт сразу или вешает навсегда — 6 с хватает.
+CURL_TIMEOUT=6
 
 # Сайты для проверки — известные жертвы DPI в РФ. Все они есть в списке
 # itdoginfo (его кладёт update.sh), поэтому tpws на них реально влияет.
-TEST_DOMAINS="www.youtube.com youtube.com www.instagram.com x.com discord.com rutracker.org"
+# i.ytimg.com — CDN превью YouTube (без него лента пустая даже при живом сайте).
+TEST_DOMAINS="www.youtube.com i.ytimg.com www.instagram.com x.com discord.com rutracker.org www.linkedin.com"
 
 [ -x "$MAC/strategy.sh" ] || { echo "[x] zapret не установлен."; exit 1; }
+[ -n "$STRATEGIES" ] || { echo "[x] strategy.sh не вернул список стратегий."; exit 1; }
+ORIGINAL=$("$MAC/strategy.sh" current 2>/dev/null)
 
 # Предупреждаем про VPN — он исказит результаты (весь трафик идёт мимо tpws).
 if scutil --nc list 2>/dev/null | grep -q '(Connected)'; then
@@ -37,7 +43,7 @@ fi
 test_domain() {
     local dom="$1"
     local res code time
-    res=$(curl -s -o /dev/null -m 8 -w "%{http_code} %{time_total}" \
+    res=$(curl -s -o /dev/null -m "$CURL_TIMEOUT" -w "%{http_code} %{time_total}" \
           --retry 0 "https://$dom/" 2>/dev/null)
     code="${res%% *}"
     time="${res##* }"
@@ -104,6 +110,10 @@ if [ -n "$BEST_NAME" ] && [ "$BEST_OK" -gt 0 ]; then
     echo "[+] Готово. Активна стратегия: $BEST_NAME"
 else
     echo "[x] Ни одна стратегия не открыла сайты."
+    if [ -n "$ORIGINAL" ]; then
+        "$MAC/strategy.sh" set "$ORIGINAL" >/dev/null 2>&1
+        echo "    Вернул прежнюю стратегию: $ORIGINAL"
+    fi
     echo "    Возможные причины: выключи VPN; обнови списки сайтов;"
     echo "    либо провайдер режет жёстко — попробуй /opt/zapret/blockcheck.sh."
 fi

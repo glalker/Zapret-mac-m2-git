@@ -18,6 +18,9 @@ fi
 INSTALL_DIR="/opt/zapret"
 HOSTS="$INSTALL_DIR/ipset/zapret-hosts-user.txt"
 URL="https://raw.githubusercontent.com/itdoginfo/allow-domains/main/Russia/inside-raw.lst"
+# Наш курируемый стартовый список: вливается в авто-блок, чтобы домены,
+# которых нет у itdoginfo (Roblox, Snapchat, трекеры…), не терялись.
+CURATED="$INSTALL_DIR/mac/zapret-hosts.txt"
 BEGIN="# >>> AUTO (itdoginfo/allow-domains) — не редактировать, перезаписывается"
 END="# <<< AUTO"
 
@@ -35,6 +38,14 @@ CLEAN=$(mktemp)
 tr -d '\r' <"$TMP" | grep -vE '^\s*#' | grep -vE '^\s*$' | sort -u >"$CLEAN"
 COUNT=$(grep -c . "$CLEAN")
 rm -f "$TMP"
+
+# Добавляем курируемые домены. COUNT уже посчитан только по itdoginfo —
+# проверка «список подозрительно короткий» ниже относится к скачанному.
+if [ -f "$CURATED" ]; then
+    MERGED=$(mktemp)
+    { cat "$CLEAN"; tr -d '\r' <"$CURATED" | grep -vE '^\s*#' | grep -vE '^\s*$'; } | sort -u >"$MERGED"
+    mv "$MERGED" "$CLEAN"
+fi
 
 if [ "$COUNT" -lt 100 ]; then
     echo "[x] Скачался подозрительно короткий список ($COUNT строк) — отменяю, чтобы не сломать."

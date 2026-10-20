@@ -68,8 +68,8 @@ cat >"$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleIdentifier</key><string>su.glalker.zapret</string>
     <key>CFBundleName</key><string>Zapret</string>
     <key>CFBundleDisplayName</key><string>Zapret</string>
-    <key>CFBundleShortVersionString</key><string>2.0.1</string>
-    <key>CFBundleVersion</key><string>2.0.1</string>
+    <key>CFBundleShortVersionString</key><string>2.1.0</string>
+    <key>CFBundleVersion</key><string>2.1.0</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>LSMinimumSystemVersion</key><string>13.0</string>
     <key>NSHighResolutionCapable</key><true/>

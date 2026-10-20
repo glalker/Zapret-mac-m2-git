@@ -1,0 +1,45 @@
+# 90-block-quic — заставляем YouTube работать через tpws.
+#
+# Зачем: tpws на macOS десинхронизирует только TCP 80/443. А YouTube в
+# Chrome/Edge/Brave/Яндексе по умолчанию ходит по QUIC (HTTP/3, UDP 443) —
+# мимо tpws. DPI этот QUIC режет, видео не грузится. Если же зарезать
+# исходящий QUIC самим, браузер автоматически откатывается на обычный
+# TCP/TLS, а его уже обрабатывает tpws. Это штатный приём (так же делает
+# zapret/GoodbyeDPI на Windows через WinDivert).
+#
+# Безопасность с VPN: если в момент применения фаервола активен VPN
+# (дефолтный маршрут через туннель или системный профиль Connected) —
+# правило НЕ добавляем. Иначе можно случайно убить VPN, который сам может
+# работать поверх UDP/443 (Hysteria2/TUIC/QUIC). При выключенном VPN
+# (нормальный режим обхода) правило добавляется и YouTube оживает.
+#
+# Отключить совсем: удалить этот файл из init.d/macos/custom.d/.
+
+_blockquic_vpn_active()
+{
+	# 1. Системные VPN-профили (IKEv2, L2TP, приложения с профилем).
+	scutil --nc list 2>/dev/null | grep -q '(Connected)' && return 0
+	# 2. Дефолтный маршрут через туннельный интерфейс
+	#    (WireGuard, OpenVPN, Outline, Amnezia, Happ и т.п.).
+	local ifc
+	ifc=$(route -n get default 2>/dev/null | awk '/interface:/{print $2}')
+	case "$ifc" in
+		utun*|ipsec*|ppp*|tun*|tap*|wg*) return 0 ;;
+	esac
+	return 1
+}
+
+# Правило уходит в anchor zapret-v4 (его же грузит и rdr-, и фильтр-проход).
+# quick — терминальное: дропаем QUIC сразу, не дожидаясь других правил.
+zapret_custom_firewall_v4()
+{
+	_blockquic_vpn_active && return 0
+	echo "block drop out quick proto udp from any to any port = 443"
+}
+
+# ipv6 в конфиге выключен (DISABLE_IPV6=1), но на случай включения — тоже режем.
+zapret_custom_firewall_v6()
+{
+	_blockquic_vpn_active && return 0
+	echo "block drop out quick proto udp from any to any port = 443"
+}

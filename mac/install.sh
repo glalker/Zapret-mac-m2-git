@@ -70,6 +70,44 @@ fi
 IN_PLACE=0
 [ "$SRC_DIR" = "$INSTALL_DIR" ] && IN_PLACE=1
 
+# Пользовательские данные, которые переживают переустановку и обновление
+# из приложения: списки доменов, выбранная стратегия, свои custom.d-скрипты.
+# Раньше rm -rf /opt/zapret их стирал — после обновления список сайтов
+# откатывался к стартовому, а YouTube снова тормозил без блокировки QUIC.
+USER_FILES="ipset/zapret-hosts-user.txt ipset/zapret-hosts-user-exclude.txt mac/.strategy"
+KEEP_DIR=""
+
+backup_user_data() {
+    KEEP_DIR=$(mktemp -d)
+    local f
+    for f in $USER_FILES; do
+        [ -f "$INSTALL_DIR/$f" ] || continue
+        mkdir -p "$KEEP_DIR/$(dirname "$f")"
+        cp -p "$INSTALL_DIR/$f" "$KEEP_DIR/$f"
+    done
+    if [ -d "$INSTALL_DIR/init.d/macos/custom.d" ]; then
+        mkdir -p "$KEEP_DIR/custom.d"
+        cp -p "$INSTALL_DIR/init.d/macos/custom.d/"* "$KEEP_DIR/custom.d/" 2>/dev/null || true
+    fi
+}
+
+restore_user_data() {
+    [ -n "$KEEP_DIR" ] && [ -d "$KEEP_DIR" ] || return 0
+    local f
+    for f in $USER_FILES; do
+        [ -f "$KEEP_DIR/$f" ] || continue
+        mkdir -p "$INSTALL_DIR/$(dirname "$f")"
+        cp -p "$KEEP_DIR/$f" "$INSTALL_DIR/$f"
+    done
+    # Свои custom.d-скрипты возвращаем, но версии из релиза не перетираем (-n).
+    if [ -d "$KEEP_DIR/custom.d" ]; then
+        mkdir -p "$INSTALL_DIR/init.d/macos/custom.d"
+        cp -pn "$KEEP_DIR/custom.d/"* "$INSTALL_DIR/init.d/macos/custom.d/" 2>/dev/null || true
+    fi
+    rm -rf "$KEEP_DIR"
+    info "Сохранённые настройки (списки сайтов, стратегия) возвращены."
+}
+
 if [ "$IN_PLACE" = "0" ]; then
     # ----- 4. Останавливаем старую установку, если есть -----
     if [ -f "$INSTALL_DIR/init.d/macos/zapret" ]; then
@@ -77,6 +115,7 @@ if [ "$IN_PLACE" = "0" ]; then
         "$INSTALL_DIR/init.d/macos/zapret" stop 2>/dev/null || true
         launchctl unload /Library/LaunchDaemons/zapret.plist 2>/dev/null || true
         rm -f /Library/LaunchDaemons/zapret.plist
+        backup_user_data
         rm -rf "$INSTALL_DIR"
     fi
 
@@ -85,6 +124,7 @@ if [ "$IN_PLACE" = "0" ]; then
     mkdir -p "$INSTALL_DIR"
     # rsync проще для частичных копий, но cp -R работает везде
     ( cd "$SRC_DIR" && tar cf - . ) | ( cd "$INSTALL_DIR" && tar xf - )
+    restore_user_data
 else
     warn "Запуск из $INSTALL_DIR — обновляю установку на месте (без копирования)."
     "$INSTALL_DIR/init.d/macos/zapret" stop 2>/dev/null || true
@@ -103,8 +143,11 @@ info "Раскладываю бинарники (mac64 universal: arm64 + x86_64
 info "Подкладываю конфигурацию и список доменов..."
 cp "$SCRIPT_DIR/config.macos"     "$INSTALL_DIR/config"
 # При обновлении на месте список доменов пользователя не трогаем.
-if [ "$IN_PLACE" = "0" ] || [ ! -f "$INSTALL_DIR/ipset/zapret-hosts-user.txt" ]; then
+# Чужой список не трогаем: и при обновлении на месте, и после restore_user_data.
+SEEDED_LIST=0
+if [ ! -f "$INSTALL_DIR/ipset/zapret-hosts-user.txt" ]; then
     cp "$SCRIPT_DIR/zapret-hosts.txt" "$INSTALL_DIR/ipset/zapret-hosts-user.txt"
+    SEEDED_LIST=1
 fi
 
 # Создаём пустой файл исключений (если его нет).
@@ -126,6 +169,23 @@ if [ "$IN_PLACE" = "0" ]; then
     cp "$SCRIPT_DIR/zapret-hosts.txt" "$INSTALL_DIR/mac/" 2>/dev/null || true
 fi
 chmod +x "$INSTALL_DIR/mac/"*.sh
+
+# config.macos выше перезаписал TPWS_OPT стратегией по умолчанию —
+# возвращаем ту, что пользователь выбрал раньше.
+if [ -f "$INSTALL_DIR/mac/.strategy" ]; then
+    SAVED_STRATEGY=$(cat "$INSTALL_DIR/mac/.strategy")
+    "$INSTALL_DIR/mac/strategy.sh" apply "$SAVED_STRATEGY" >/dev/null 2>&1 \
+        && info "Стратегия «$SAVED_STRATEGY» сохранена." \
+        || { echo default >"$INSTALL_DIR/mac/.strategy"
+             warn "Стратегии «$SAVED_STRATEGY» больше нет — используется default."; }
+fi
+
+# Свежая установка: сразу тянем большой список заблокированных доменов.
+# Не получилось (нет сети) — не страшно, останется стартовый список.
+if [ "$SEEDED_LIST" = "1" ]; then
+    info "Скачиваю актуальный список заблокированных сайтов..."
+    "$INSTALL_DIR/mac/update.sh" || warn "Список не скачался — нажми «Обновить списки сайтов» в приложении позже."
+fi
 
 # Копируем приложение в /Applications, чтобы оно было под рукой в Spotlight
 # и его мог найти агент автооткрытия при входе в систему.
