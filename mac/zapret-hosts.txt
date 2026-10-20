@@ -1,6 +1,13 @@
 # Список сайтов, к которым применяется обход DPI.
 # Один домен на строку. Поддомены подхватываются автоматически.
 # Можешь добавлять свои строки или удалять ненужные.
+#
+# Это стартовый список. Кнопка «Обновить списки сайтов» скачивает большой
+# курируемый список itdoginfo/allow-domains (~1200 доменов) и ДОБАВЛЯЕТ к нему
+# всё отсюда — так домены, которых нет у itdoginfo (Roblox, Snapchat…), не теряются.
+#
+# Обход DPI НЕ помогает там, где сервис сам не пускает пользователей из РФ
+# (ChatGPT, Claude, Gemini, Spotify, Netflix и т.п.) — для них нужен VPN.
 
 # === YouTube и сервисы Google для видео ===
 youtube.com
@@ -15,6 +22,9 @@ withyoutube.com
 youtube-nocookie.com
 youtubekids.com
 youtubeembeddedplayer.googleapis.com
+youtubei.googleapis.com
+jnn-pa.googleapis.com
+yt.be
 
 # === Meta / Запрещены в РФ ===
 instagram.com
@@ -64,3 +74,25 @@ protonmail.com
 protonvpn.com
 medium.com
 imgur.com
+
+# === Торрент-трекеры ===
+rutracker.org
+rutracker.cc
+rutracker.net
+rutor.info
+rutor.is
+nnmclub.to
+kinozal.tv
+
+# === Заблокированы в 2024–2025 ===
+roblox.com
+rbxcdn.com
+rbx.com
+robloxlabs.com
+snapchat.com
+snap.com
+sc-cdn.net
+snapkit.com
+viber.com
+signal.org
+speedtest.net

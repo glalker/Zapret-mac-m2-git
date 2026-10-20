@@ -27,16 +27,20 @@ struct Strategy: Identifiable, Hashable {
 }
 
 let kStrategies: [Strategy] = [
-    Strategy(id: "default",    title: "Сплит SNI + disorder — рекомендуется"),
-    Strategy(id: "split-only", title: "Только сплит — если default рвёт соединения"),
-    Strategy(id: "midsld",     title: "Сплит по середине домена + disorder"),
-    Strategy(id: "oob",        title: "Сплит + out-of-band — против въедливых DPI"),
-    Strategy(id: "hostcase",   title: "Искажение Host + сплит — запасной вариант"),
+    Strategy(id: "default",      title: "Сплит SNI + disorder — рекомендуется"),
+    Strategy(id: "tlsrec",       title: "TLS-записи + сплит — сильнее против ТСПУ"),
+    Strategy(id: "tlsrec-multi", title: "TLS-записи + мультисплит — если tlsrec мало"),
+    Strategy(id: "tlsrec-mid",   title: "TLS-запись посреди домена + disorder"),
+    Strategy(id: "multisplit",   title: "Мультисплит по домену, без TLS-записей"),
+    Strategy(id: "split-only",   title: "Только сплит — если default рвёт соединения"),
+    Strategy(id: "midsld",       title: "Сплит по середине домена + disorder"),
+    Strategy(id: "hostcase",     title: "Искажение Host + сплит — запасной вариант"),
+    Strategy(id: "oob",          title: "Out-of-band — экспериментально, не под VPN"),
 ]
 
 let kInstallDir = "/opt/zapret"
 let kMacDir = "/opt/zapret/mac"
-let kAppVersion = "2.0.1"
+let kAppVersion = "2.1.0"
 let kRepo = "glalker/Zapret-mac-m2-git"
 
 // MARK: - Запуск процессов
